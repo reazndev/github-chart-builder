@@ -263,16 +263,6 @@ const App = () => {
               
               <div className="card-content">
                 <div className="space-y-4">
-                  <div className="form-group">
-                    <label className="form-label">Background</label>
-                    <input
-                      type="text"
-                      value={config.backgroundColor}
-                      readOnly
-                      className="form-input form-input-mono"
-                    />
-                    <p className="form-note">Background is always transparent</p>
-                  </div>
 
                   <div className="color-grid">
                     <div>

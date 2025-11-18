@@ -7,7 +7,7 @@
   Lightweight tool to preview, tweak colors/layout, and generate a sharable URL or image to use on your own website :)
 </p>
 <p align="center">
-  <a href="https://github.com/reazndev/github-chart-builder"><img src="https://img.shields.io/badge/repo-reazndev%2Fgithub--chart--builder-24292f" alt="repo" /></a>
+  <a href="https://gh.ruu.by"><img src="https://img.shields.io/badge/website-gh.ruu.by-24292f" alt="website" /></a>
   <a href="https://github.com/reazndev/github-chart-builder/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen" alt="build"/></a>
   <a href="https://github.com/reazndev/github-chart-builder/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-24292f.svg" alt="license"/></a>
 </p>

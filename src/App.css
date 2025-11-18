@@ -3,7 +3,6 @@
   display: flex;
   flex-direction: column;
   background-color: #fafafa;
-  /* leave space for fixed footer so content isn't covered */
   padding-bottom: 3rem;
 }
 
@@ -98,11 +97,9 @@
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
-  /* allow footer to sit at bottom */
   flex: 1 0 auto;
 }
 
-/* Minimal, lowkey footer */
 .site-footer {
   border-top: 1px solid rgba(16, 24, 40, 0.06);
   background: rgba(255,255,255,0.92);
@@ -113,7 +110,6 @@
   bottom: 0;
   width: 100%;
   z-index: 60;
-  /* subtle backdrop to match header feel */
   backdrop-filter: blur(6px);
 }
 .footer-container {
@@ -126,7 +122,7 @@
 }
 .footer-text {
   font-size: 0.75rem;
-  color: #6b7280; /* gray-500 */
+  color: #6b7280;
   margin: 0;
 }
 .footer-link {

@@ -2,7 +2,12 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #fafafa;
+    background-color: #fafafa;
+    background-image:
+      linear-gradient(rgba(16, 24, 40, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(16, 24, 40, 0.025) 1px, transparent 1px);
+    background-size: 90px 90px, 90px 90px;
+    background-position: 0 0, 0 0;
   padding-bottom: 3rem;
 }
 

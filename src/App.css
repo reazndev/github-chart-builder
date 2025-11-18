@@ -1,6 +1,10 @@
 .app {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background-color: #fafafa;
+  /* leave space for fixed footer so content isn't covered */
+  padding-bottom: 3rem;
 }
 
 
@@ -94,6 +98,45 @@
   max-width: 1280px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
+  /* allow footer to sit at bottom */
+  flex: 1 0 auto;
+}
+
+/* Minimal, lowkey footer */
+.site-footer {
+  border-top: 1px solid rgba(16, 24, 40, 0.06);
+  background: rgba(255,255,255,0.92);
+  padding: 0.5rem 0;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  z-index: 60;
+  /* subtle backdrop to match header feel */
+  backdrop-filter: blur(6px);
+}
+.footer-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.footer-text {
+  font-size: 0.75rem;
+  color: #6b7280; /* gray-500 */
+  margin: 0;
+}
+.footer-link {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 600;
+  margin-left: 0.25rem;
+}
+.footer-link:hover {
+  text-decoration: underline;
 }
 
 .grid {

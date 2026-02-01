@@ -35,7 +35,7 @@ const App = () => {
       labelColor: config.labelColor
     });
 
-    const url = `https://reazn.tech/api/github-contributions/${config.username}?${params.toString()}`;
+    const url = `https://archived.ruu.by/api/github-contributions/${config.username}?${params.toString()}`;
     setPreviewUrl(url);
   }, [config]);
 
@@ -69,6 +69,26 @@ const App = () => {
       inactiveColor: '#ececf0',
       minActivityColor: '#e8cb38',
       maxActivityColor: '#5649cc'
+    },
+    midnight: {
+      inactiveColor: '#1a1f2e',
+      minActivityColor: '#4a5568',
+      maxActivityColor: '#3b82f6'
+    },
+    candy: {
+      inactiveColor: '#fce4ec',
+      minActivityColor: '#f06292',
+      maxActivityColor: '#ad1457'
+    },
+    monochrome: {
+      inactiveColor: '#f5f5f5',
+      minActivityColor: '#9e9e9e',
+      maxActivityColor: '#212121'
+    },
+    amber: {
+      inactiveColor: '#fff8e1',
+      minActivityColor: '#ffb300',
+      maxActivityColor: '#e65100'
     }
   };
 
@@ -312,7 +332,6 @@ const App = () => {
         </div>
       </div>
 
-      {/* Minimal footer */}
       <footer className="site-footer">
         <div className="footer-container">
           <p className="footer-text">Built by <a href="https://github.com/reazndev" target="_blank" rel="noopener noreferrer" className="footer-link">@reazndev</a></p>

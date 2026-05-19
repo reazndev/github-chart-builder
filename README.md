@@ -1,6 +1,6 @@
 # <p align="center">GitHub Chart Builder</p>
 <p align="center">
-  <img src="./public/vite.svg" width="100" alt="GitHub Chart Builder Logo">
+  <img src="./public/favicon.png" width="100" alt="GitHub Chart Builder Logo">
 </p>
 <p align="center">
   <strong>Generate customizable SVG contribution charts for your portfolio or README.</strong>

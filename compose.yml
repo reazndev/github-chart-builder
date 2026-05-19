@@ -1,0 +1,12 @@
+services:
+  chart-builder:
+    build: .
+    image: ghcr.io/reazndev/github-chart-builder:latest
+    container_name: github-chart-builder
+    restart: unless-stopped
+    ports:
+      - "8030:8030"
+    environment:
+      - PORT=8030
+      - NODE_ENV=production
+      - GITHUB_TOKEN=${GITHUB_TOKEN}

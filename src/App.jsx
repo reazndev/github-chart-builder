@@ -35,7 +35,10 @@ const App = () => {
       labelColor: config.labelColor
     });
 
-    const url = `https://archived.ruu.by/api/github-contributions/${config.username}?${params.toString()}`;
+    // Support static deployments (using a separate backend URL via env)
+    // or unified VPS deployments (defaults to relative origin).
+    const apiBase = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+    const url = `${apiBase}/api/github-contributions/${config.username}?${params.toString()}`;
     setPreviewUrl(url);
   }, [config]);
 

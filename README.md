@@ -1,10 +1,9 @@
 # <p align="center">GitHub Chart Builder</p>
 <p align="center">
-  <img src="./public/vite.svg" width="120" alt="GitHub Chart Builder Logo">
+  <img src="./public/vite.svg" width="100" alt="GitHub Chart Builder Logo">
 </p>
 <p align="center">
-  <strong>Customize and embed a clean, dynamic GitHub contributions chart.</strong> <br>
-  A lightweight utility to tweak color palettes, configure spacing, adjust grids, and generate an SVG chart URL for your portfolio or readme.
+  <strong>Generate customizable SVG contribution charts for your portfolio or README.</strong>
 </p>
 <p align="center">
   <a href="https://gh.ruu.by"><img src="https://img.shields.io/badge/website-gh.ruu.by-24292f" alt="website" /></a>
@@ -13,18 +12,16 @@
 
 ---
 
-## What is this?
+A simple tool to customize your GitHub contribution graph and generate a clean SVG image to embed in your portfolio or profile README. 
 
-This is a self-contained full-stack app that wraps GitHub's GraphQL API and serves custom contribution charts as clean SVGs. It features an interactive UI built with React/Vite to customize layout parameters (such as grid spacing, borders, size, and duration) and construct custom color palettes, outputting a shareable API URL to use in image tags.
+It runs on a single Express server that queries GitHub's GraphQL API, handles layout parameters, and serves an interactive React panel where you can test usernames and build color palettes.
 
-## Core Features
+## Features
 
-- **Live Customization Preview:** Enter a GitHub handle to immediately see how the chart renders.
-- **Dynamic Color Palettes:** Includes standard presets (like classic GitHub, Sunset, Ocean, and Purple) and custom color inputs to define exact active and inactive states.
-- **Fine-grained Sizing controls:** Adjust timeframes (1 to 12 months), box spacing, box sizes, and border-radius.
-- **Copy-to-Clipboard Link Generator:** Automatically encodes configuration rules into clean query parameters on a shareable URL.
-- **Unified Full-Stack App:** Combines a fast Express-based SVG generation API and static build hosting in a single, lightweight repository.
-- **Dockerized Deployment:** Bundled with multi-stage Dockerfiles and compose setups for immediate hosting on a VPS or homelab cluster.
+- **Interactive Preview:** Type any GitHub username to see their graph instantly.
+- **Custom Themes:** Pick from built-in presets or configure custom Hex colors for active/inactive days.
+- **Tweak Everything:** Adjust months (1-12), box sizes, cell spacing, and border radius.
+- **Unified & Containerized:** Single React + Node application with simple Docker/Compose setup.
 
 ## Query Options
 
@@ -91,8 +88,6 @@ To build and host using Docker Compose:
 ---
 
 ## Contributing
-
-Originally, the API logic lived in my old portfolio repo, and the frontend served as a separate preview tool. Since then, the two have been merged into this unified repository. 
 
 Feel free to open an issue or submit a pull request if you run into bugs or have layout improvements to share!
 

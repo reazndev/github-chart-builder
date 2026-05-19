@@ -92,6 +92,31 @@ const App = () => {
       inactiveColor: '#fff8e1',
       minActivityColor: '#ffb300',
       maxActivityColor: '#e65100'
+    },
+    catppuccin: {
+      inactiveColor: '#313244',
+      minActivityColor: '#a6e3a1',
+      maxActivityColor: '#cba6f7'
+    },
+    dracula: {
+      inactiveColor: '#282a36',
+      minActivityColor: '#8be9fd',
+      maxActivityColor: '#bd93f9'
+    },
+    nord: {
+      inactiveColor: '#2e3440',
+      minActivityColor: '#8fbcbb',
+      maxActivityColor: '#88c0d0'
+    },
+    gruvbox: {
+      inactiveColor: '#282828',
+      minActivityColor: '#b8bb26',
+      maxActivityColor: '#fe8019'
+    },
+    'tokyo night': {
+      inactiveColor: '#16161e',
+      minActivityColor: '#7aa2f7',
+      maxActivityColor: '#bb9af3'
     }
   };
 
@@ -119,12 +144,6 @@ const App = () => {
               <h1 className="header-title">Contributions Chart Builder</h1>
               <p className="header-subtitle">Customize your GitHub contribution graph</p>
             </div>
-          </div>
-          <div className="header-buttons">
-            <button onClick={copyToClipboard} className="btn btn-primary">
-              {copied ? <Check className="btn-icon" /> : <Copy className="btn-icon" />}
-              {copied ? 'Copied' : 'Copy URL'}
-            </button>
           </div>
         </div>
       </header>
@@ -163,8 +182,14 @@ const App = () => {
                 <h2 className="card-title">Generated URL</h2>
               </div>
               <div className="card-content">
-                <div className="url-display">
-                  {previewUrl}
+                <div className="url-container">
+                  <div className="url-display">
+                    {previewUrl}
+                  </div>
+                  <button onClick={copyToClipboard} className="copy-url-btn">
+                    {copied ? <Check className="btn-icon" /> : <Copy className="btn-icon" />}
+                    {copied ? 'Copied' : 'Copy URL'}
+                  </button>
                 </div>
               </div>
             </div>

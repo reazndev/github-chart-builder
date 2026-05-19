@@ -1,54 +1,100 @@
 # <p align="center">GitHub Chart Builder</p>
 <p align="center">
-  <img src="./public/vite.svg" width="160" alt="GitHub Chart Builder Logo">
+  <img src="./public/vite.svg" width="120" alt="GitHub Chart Builder Logo">
 </p>
 <p align="center">
-  <strong>Customize and export a GitHub contributions chart image.</strong> <br>
-  Lightweight tool to preview, tweak colors/layout, and generate a sharable URL or image to use on your own website :)
+  <strong>Customize and embed a clean, dynamic GitHub contributions chart.</strong> <br>
+  A lightweight utility to tweak color palettes, configure spacing, adjust grids, and generate an SVG chart URL for your portfolio or readme.
 </p>
 <p align="center">
   <a href="https://gh.ruu.by"><img src="https://img.shields.io/badge/website-gh.ruu.by-24292f" alt="website" /></a>
-  <a href="https://github.com/reazndev/github-chart-builder/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen" alt="build"/></a>
   <a href="https://github.com/reazndev/github-chart-builder/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-24292f.svg" alt="license"/></a>
 </p>
 
 ---
 
-## 🚀 Features
+## What is this?
 
-- Live preview of a GitHub contributions chart (by username)
-- Export a generated URL you can share or embed
-- Preset color themes and fine-grained color controls
-- Controls for months, box size, spacing, and border radius
-- Minimal, responsive UI with copy-to-clipboard and quick export
+This is a self-contained full-stack app that wraps GitHub's GraphQL API and serves custom contribution charts as clean SVGs. It features an interactive UI built with React/Vite to customize layout parameters (such as grid spacing, borders, size, and duration) and construct custom color palettes, outputting a shareable API URL to use in image tags.
 
-## ⚙️ Configurable options
+## Core Features
 
-Most options are available in the UI. Key fields you can change:
+- **Live Customization Preview:** Enter a GitHub handle to immediately see how the chart renders.
+- **Dynamic Color Palettes:** Includes standard presets (like classic GitHub, Sunset, Ocean, and Purple) and custom color inputs to define exact active and inactive states.
+- **Fine-grained Sizing controls:** Adjust timeframes (1 to 12 months), box spacing, box sizes, and border-radius.
+- **Copy-to-Clipboard Link Generator:** Automatically encodes configuration rules into clean query parameters on a shareable URL.
+- **Unified Full-Stack App:** Combines a fast Express-based SVG generation API and static build hosting in a single, lightweight repository.
+- **Dockerized Deployment:** Bundled with multi-stage Dockerfiles and compose setups for immediate hosting on a VPS or homelab cluster.
 
-- Username (GitHub handle) - which user to preview
-- Timeframe (1-12 months),
-- _box size (bit buggy, use default setting)_
-- _spacing (bit buggy, use default setting)_
-- border radius
-- Colors:
-  - inactive
-  - min/max activity
-  - label color
+## Query Options
 
-The app constructs a shareable URL with the options encoded as query params.
+The backend handles parameters directly via URL queries, including:
 
-## 📸 Screenshots
+- `months` (1-12)
+- `boxSize` (pixel dimension of grid cells)
+- `boxSpacing` (pixel spacing between grid cells)
+- `borderRadius` (border curves for grid cells)
+- `inactiveColor` (hex code for zero contribution days)
+- `minActivityColor` (hex code for low contribution days)
+- `maxActivityColor` (hex code for high contribution days)
+- `showLabels` (boolean flag to toggle month listings)
+- `labelColor` (hex code for month labels)
+
+---
+
+## Screenshots
 
 <img width="1316" height="1023" alt="image" src="https://github.com/user-attachments/assets/11e89580-922e-4a75-9eef-e196f6c9967f" />
 
+---
 
+## Local Development
 
-## 🤝 Contributing
+To run the application locally, you will need a personal GitHub access token (minimal `read:user` scope).
 
-The backend API that powers this tool is in a separate repository: [my old portfolio](https://github.com/reazndev/Portfolio-v2/blob/master/gh-contributions.js). I wrote it a while ago and recently revisited it, realizing the tool might be useful to others. This frontend is a simple interface I built to make it easy to preview and share charts.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/reazndev/github-chart-builder.git
+   cd github-chart-builder
+   ```
 
-At the moment, there’s not much to contribute, but feedback, bug reports, or ideas for improvements are always welcome!
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Setup environment variables:
+   Copy `.env.example` to `.env` and fill in your GITHUB_TOKEN:
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Launch in development mode:
+   ```bash
+   npm run dev
+   ```
+   *Runs both Vite and Express concurrently. Open `http://localhost:5173` to view the app.*
+
+---
+
+## Production & Docker Deployment
+
+To build and host using Docker Compose:
+
+1. Copy `.env.example` to `.env` and specify your `GITHUB_TOKEN`.
+2. Spin up the container stack:
+   ```bash
+   docker compose up -d
+   ```
+   *The container exposes port `8030`, serving both the API endpoints and the optimized built frontend assets.*
+
+---
+
+## Contributing
+
+Originally, the API logic lived in my old portfolio repo, and the frontend served as a separate preview tool. Since then, the two have been merged into this unified repository. 
+
+Feel free to open an issue or submit a pull request if you run into bugs or have layout improvements to share!
 
 ## Contributors
 
@@ -59,10 +105,12 @@ At the moment, there’s not much to contribute, but feedback, bug reports, or i
         <img src="https://github.com/reazndev.png" width="80px" alt="Reazn"/>
         <br /><sub><b>Reazn</b></sub>
         <br /><sub>Author</sub>
+        <br /><sub>@reazndev</sub>
       </a>
     </td>
+  </tr>
 </table>
 
-## 📄 License
+## License
 
 This project is MIT licensed — see [LICENSE](LICENSE).

@@ -99,6 +99,15 @@ const App = () => {
     setConfig(prev => ({ ...prev, ...presets[preset] }));
   };
 
+  const isPresetSelected = (presetName) => {
+    const preset = presets[presetName];
+    return (
+      config.inactiveColor.toLowerCase() === preset.inactiveColor.toLowerCase() &&
+      config.minActivityColor.toLowerCase() === preset.minActivityColor.toLowerCase() &&
+      config.maxActivityColor.toLowerCase() === preset.maxActivityColor.toLowerCase()
+    );
+  };
+
   return (
     <div className="app">
       {/* Header */}
@@ -269,7 +278,7 @@ const App = () => {
                     <button
                       key={preset}
                       onClick={() => applyPreset(preset)}
-                      className="preset-button"
+                      className={`preset-button ${isPresetSelected(preset) ? 'active' : ''}`}
                     >
                       {preset}
                     </button>

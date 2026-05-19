@@ -14,8 +14,6 @@
 
 A simple tool to customize your GitHub contribution graph and generate a clean SVG image to embed in your portfolio or profile README. 
 
-It runs on a single Express server that queries GitHub's GraphQL API, handles layout parameters, and serves an interactive React panel where you can test usernames and build color palettes.
-
 ## Features
 
 - **Interactive Preview:** Type any GitHub username to see their graph instantly.

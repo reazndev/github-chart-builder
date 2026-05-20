@@ -19,8 +19,21 @@ const App = () => {
 
   const [previewUrl, setPreviewUrl] = useState('');
   const [copied, setCopied] = useState(false);
+  const [debouncedUsername, setDebouncedUsername] = useState(config.username);
+  const [imgStatus, setImgStatus] = useState('loading'); // 'loading' | 'success' | 'error' | 'idle'
 
+  // Debounce username to prevent spamming the GitHub GraphQL API on every keystroke
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedUsername(config.username);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [config.username]);
+
+  // Update preview URL when configuration or debounced username changes
+  useEffect(() => {
+    if (!debouncedUsername) return;
+
     const params = new URLSearchParams({
       months: config.months.toString(),
       boxSize: config.boxSize.toString(),
@@ -35,12 +48,39 @@ const App = () => {
       labelColor: config.labelColor
     });
 
-    // Support static deployments (using a separate backend URL via env)
-    // or unified VPS deployments (defaults to relative origin).
     const apiBase = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-    const url = `${apiBase}/api/github-contributions/${config.username}?${params.toString()}`;
+    const url = `${apiBase}/api/github-contributions/${debouncedUsername}?${params.toString()}`;
     setPreviewUrl(url);
-  }, [config]);
+  }, [
+    debouncedUsername,
+    config.months,
+    config.boxSize,
+    config.boxSpacing,
+    config.borderRadius,
+    config.backgroundColor,
+    config.inactiveColor,
+    config.minActivityColor,
+    config.maxActivityColor,
+    config.showLabels,
+    config.labelColor
+  ]);
+
+  // Set image loading/idle state
+  useEffect(() => {
+    if (!config.username) {
+      setImgStatus('idle');
+      return;
+    }
+    setImgStatus('loading');
+  }, [previewUrl, config.username]);
+
+  const handleImageLoad = () => {
+    setImgStatus('success');
+  };
+
+  const handleImageError = () => {
+    setImgStatus('error');
+  };
 
   const handleChange = (key, value) => {
     setConfig(prev => ({ ...prev, [key]: value }));
@@ -159,19 +199,30 @@ const App = () => {
               <div className="card-content">
                 <div className="preview-container">
                   {config.username ? (
-                    <img
-                      src={previewUrl}
-                      alt="GitHub Contributions Chart"
-                      className="preview-image"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.nextSibling.style.display = 'block';
-                      }}
-                    />
+                    <>
+                      {imgStatus === 'loading' && (
+                        <div className="preview-loading">
+                          <div className="spinner"></div>
+                          <p>Fetching contributions...</p>
+                        </div>
+                      )}
+                      {imgStatus === 'error' && (
+                        <div className="preview-error">
+                          Unable to load contributions chart. Please check the username or try again later.
+                        </div>
+                      )}
+                      <img
+                        src={previewUrl}
+                        alt="GitHub Contributions Chart"
+                        className="preview-image"
+                        style={{ display: imgStatus === 'success' ? 'block' : 'none' }}
+                        onLoad={handleImageLoad}
+                        onError={handleImageError}
+                      />
+                    </>
                   ) : (
                     <p className="preview-placeholder">Enter a username to preview</p>
                   )}
-                  <p className="preview-error">Unable to load chart</p>
                 </div>
               </div>
             </div>

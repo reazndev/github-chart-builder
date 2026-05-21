@@ -14,45 +14,47 @@ const App = () => {
     minActivityColor: '#e8cb38',
     maxActivityColor: '#5649cc',
     showLabels: true,
-    labelColor: '#24292f'
+    labelColor: '#24292f',
+    ignoreOutliers: false
   });
 
   const [previewUrl, setPreviewUrl] = useState('');
   const [copied, setCopied] = useState(false);
-  const [debouncedUsername, setDebouncedUsername] = useState(config.username);
+  const [debouncedConfig, setDebouncedConfig] = useState(config);
   const [imgStatus, setImgStatus] = useState('loading'); // 'loading' | 'success' | 'error' | 'idle'
   const [durationMode, setDurationMode] = useState('preset'); // 'preset' | 'custom'
   const [customRange, setCustomRange] = useState({
     from: '2023-01-01'
   });
+  const [svgContent, setSvgContent] = useState('');
 
-  // Debounce username to prevent spamming the GitHub GraphQL API on every keystroke
+  // Debounce the entire config to prevent spamming the GitHub GraphQL API during rapid typing/clicking/dragging
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedUsername(config.username);
-    }, 500);
+      setDebouncedConfig(config);
+    }, 400);
     return () => clearTimeout(timer);
-  }, [config.username]);
+  }, [config]);
 
-  // Update preview URL when configuration, durationMode, customRange or debounced username changes
+  // Update preview URL when debounced config, durationMode, or customRange changes
   useEffect(() => {
-    if (!debouncedUsername) return;
+    if (!debouncedConfig.username) return;
 
     const baseParams = {
-      boxSize: config.boxSize.toString(),
-      boxSpacing: config.boxSpacing.toString(),
-      borderRadius: config.borderRadius.toString(),
-      // pass raw values and let URLSearchParams handle encoding
-      backgroundColor: config.backgroundColor,
-      inactiveColor: config.inactiveColor,
-      minActivityColor: config.minActivityColor,
-      maxActivityColor: config.maxActivityColor,
-      showLabels: config.showLabels.toString(),
-      labelColor: config.labelColor
+      boxSize: debouncedConfig.boxSize.toString(),
+      boxSpacing: debouncedConfig.boxSpacing.toString(),
+      borderRadius: debouncedConfig.borderRadius.toString(),
+      backgroundColor: debouncedConfig.backgroundColor,
+      inactiveColor: debouncedConfig.inactiveColor,
+      minActivityColor: debouncedConfig.minActivityColor,
+      maxActivityColor: debouncedConfig.maxActivityColor,
+      showLabels: debouncedConfig.showLabels.toString(),
+      labelColor: debouncedConfig.labelColor,
+      ignoreOutliers: debouncedConfig.ignoreOutliers.toString()
     };
 
     if (durationMode === 'preset') {
-      baseParams.months = config.months.toString();
+      baseParams.months = debouncedConfig.months.toString();
     } else {
       baseParams.from = customRange.from;
     }
@@ -60,40 +62,56 @@ const App = () => {
     const params = new URLSearchParams(baseParams);
 
     const apiBase = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-    const url = `${apiBase}/api/github-contributions/${debouncedUsername}?${params.toString()}`;
+    const url = `${apiBase}/api/github-contributions/${debouncedConfig.username}?${params.toString()}`;
     setPreviewUrl(url);
   }, [
-    debouncedUsername,
+    debouncedConfig,
     durationMode,
-    config.months,
-    customRange.from,
-    config.boxSize,
-    config.boxSpacing,
-    config.borderRadius,
-    config.backgroundColor,
-    config.inactiveColor,
-    config.minActivityColor,
-    config.maxActivityColor,
-    config.showLabels,
-    config.labelColor
+    customRange.from
   ]);
 
-  // Set image loading/idle state
+  // Fetch SVG content reactively, utilizing AbortController to cleanly cancel previous/stacked requests
   useEffect(() => {
-    if (!config.username) {
+    if (!previewUrl) {
       setImgStatus('idle');
+      setSvgContent('');
       return;
     }
+
     setImgStatus('loading');
-  }, [previewUrl, config.username]);
+    const controller = new AbortController();
 
-  const handleImageLoad = () => {
-    setImgStatus('success');
-  };
+    fetch(previewUrl, { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to fetch contributions');
+        }
+        // Handle API JSON error responses gracefully
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          return response.json().then(err => {
+            throw new Error(err.details || err.error || 'Failed to fetch contributions');
+          });
+        }
+        return response.text();
+      })
+      .then(svgText => {
+        setSvgContent(svgText);
+        setImgStatus('success');
+      })
+      .catch(error => {
+        if (error.name === 'AbortError') {
+          // Ignore aborted request
+          return;
+        }
+        console.error('Error fetching preview SVG:', error);
+        setImgStatus('error');
+      });
 
-  const handleImageError = () => {
-    setImgStatus('error');
-  };
+    return () => {
+      controller.abort();
+    };
+  }, [previewUrl]);
 
   const handleChange = (key, value) => {
     setConfig(prev => ({ ...prev, [key]: value }));
@@ -224,14 +242,13 @@ const App = () => {
                           Unable to load contributions chart. Please check the username or try again later.
                         </div>
                       )}
-                      <img
-                        src={previewUrl}
-                        alt="GitHub Contributions Chart"
-                        className="preview-image"
-                        style={{ display: imgStatus === 'success' ? 'block' : 'none' }}
-                        onLoad={handleImageLoad}
-                        onError={handleImageError}
-                      />
+                      {imgStatus === 'success' && svgContent && (
+                        <div
+                          className="preview-svg-container"
+                          style={{ display: 'block', maxWidth: '100%', overflowX: 'auto' }}
+                          dangerouslySetInnerHTML={{ __html: svgContent }}
+                        />
+                      )}
                     </>
                   ) : (
                     <p className="preview-placeholder">Enter a username to preview</p>
@@ -385,6 +402,22 @@ const App = () => {
                       className={`toggle-button ${config.showLabels ? 'active' : 'inactive'}`}
                     >
                       <span className={`toggle-thumb ${config.showLabels ? 'active' : ''}`} />
+                    </button>
+                  </div>
+
+                  <div className="toggle-container" style={{ marginTop: '0.75rem' }}>
+                    <div style={{ flex: 1, paddingRight: '1rem' }}>
+                      <label className="form-label" style={{ marginBottom: 0 }}>Ignore Outliers</label>
+                      <p className="slider-value" style={{ fontSize: '0.6875rem', marginTop: '0.125rem', lineHeight: '1.2' }}>
+                        Caps the color scaling range to the 98th percentile of active days to filter anomalous peaks.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('ignoreOutliers', !config.ignoreOutliers)}
+                      className={`toggle-button ${config.ignoreOutliers ? 'active' : 'inactive'}`}
+                    >
+                      <span className={`toggle-thumb ${config.ignoreOutliers ? 'active' : ''}`} />
                     </button>
                   </div>
                 </div>

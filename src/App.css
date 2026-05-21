@@ -201,9 +201,11 @@
   border: 1px solid #e5e5e5;
 }
 
-.preview-image {
+.preview-image,
+.preview-svg-container svg {
   max-width: 100%;
   height: auto;
+  display: block;
 }
 
 .preview-placeholder {

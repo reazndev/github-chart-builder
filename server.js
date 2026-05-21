@@ -103,7 +103,8 @@ async function fetchContributions(username, from, to) {
         headers: {
           'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
           'Content-Type': 'application/json',
-        }
+        },
+        timeout: 15000
       });
 
       if (response.data.errors) {
@@ -231,7 +232,8 @@ function generateSVG(contributions, options = {}) {
     minActivityColor = DEFAULT_COLORS.minActivity,
     maxActivityColor = DEFAULT_COLORS.maxActivity,
     showLabels = true,
-    labelColor = '#24292f'
+    labelColor = '#24292f',
+    ignoreOutliers = false
   } = options;
 
   // Ensure all numeric values are valid
@@ -246,13 +248,33 @@ function generateSVG(contributions, options = {}) {
   const width = (boxWidth + validBoxSpacing) * weeks.length;
   const height = (boxHeight + validBoxSpacing) * 7 + labelHeight;
 
-  // Find the maximum contribution count
+  // Find the maximum contribution count (optionally ignoring high outliers using the 98th percentile)
   let maxCount = 0;
-  weeks.forEach(week => {
-    week.contributionDays.forEach(day => {
-      maxCount = Math.max(maxCount, day.contributionCount);
+  if (ignoreOutliers) {
+    const activeCounts = [];
+    weeks.forEach(week => {
+      week.contributionDays.forEach(day => {
+        if (day.contributionCount > 0) {
+          activeCounts.push(day.contributionCount);
+        }
+      });
     });
-  });
+
+    if (activeCounts.length > 0) {
+      activeCounts.sort((a, b) => a - b);
+      // Use the 98th percentile of active days to clip top 2% outliers
+      const percentileIndex = Math.floor(activeCounts.length * 0.98);
+      maxCount = activeCounts[percentileIndex] || 1;
+    } else {
+      maxCount = 1;
+    }
+  } else {
+    weeks.forEach(week => {
+      week.contributionDays.forEach(day => {
+        maxCount = Math.max(maxCount, day.contributionCount);
+      });
+    });
+  }
 
   // Generate color gradient
   const activityColors = generateColorGradient(minActivityColor, maxActivityColor, 4);
@@ -367,7 +389,8 @@ app.get('/api/github-contributions/:username', async (req, res) => {
       minActivityColor = '#e8cb38',
       maxActivityColor = '#5649cc',
       showLabels = 'true',
-      labelColor = '#24292f'
+      labelColor = '#24292f',
+      ignoreOutliers = 'false'
     } = req.query;
 
     // Calculate date range based on months parameter or use provided from/to dates
@@ -400,7 +423,8 @@ app.get('/api/github-contributions/:username', async (req, res) => {
       minActivityColor,
       maxActivityColor,
       showLabels: showLabels !== 'false',
-      labelColor
+      labelColor,
+      ignoreOutliers: ignoreOutliers === 'true'
     });
 
     res.setHeader('Content-Type', 'image/svg+xml');

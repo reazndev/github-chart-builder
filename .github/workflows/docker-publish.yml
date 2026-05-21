@@ -52,3 +52,17 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Wait 15 seconds and trigger Komodo webhook
+        env:
+          KOMODO_WEBHOOK: ${{ secrets.KOMODO_WEBHOOK || vars.KOMODO_WEBHOOK }}
+          KOMODO_WEBHOOK_SECRET: ${{ secrets.KOMODO_WEBHOOK_SECRET || vars.KOMODO_WEBHOOK_SECRET }}
+        run: |
+          echo "Waiting 15 seconds before triggering webhook..."
+          sleep 15
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Komodo-Secret: $KOMODO_WEBHOOK_SECRET" \
+            -H "Authorization: Bearer $KOMODO_WEBHOOK_SECRET" \
+            -d "{\"event\": \"build_complete\", \"status\": \"success\", \"repository\": \"${{ github.repository }}\", \"secret\": \"$KOMODO_WEBHOOK_SECRET\"}" \
+            "$KOMODO_WEBHOOK"

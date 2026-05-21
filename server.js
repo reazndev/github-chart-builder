@@ -373,6 +373,14 @@ function calculateDateRange(months = 12) {
   };
 }
 
+// Simple in-memory cache to prevent spamming GitHub API
+const apiCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+function getCacheKey(username, from, to) {
+  return `${username}:${from}:${to}`;
+}
+
 // API Endpoint for GitHub Contributions SVG
 app.get('/api/github-contributions/:username', async (req, res) => {
   try {
@@ -412,7 +420,33 @@ app.get('/api/github-contributions/:username', async (req, res) => {
       dateRange = calculateDateRange(12); // Default to 12 months
     }
 
-    const contributions = await fetchContributions(username, dateRange.from, dateRange.to);
+    const cacheKey = getCacheKey(username, dateRange.from, dateRange.to);
+    const cachedEntry = apiCache.get(cacheKey);
+    const now = Date.now();
+
+    let contributions;
+    if (cachedEntry && (now - cachedEntry.timestamp < CACHE_TTL)) {
+      contributions = cachedEntry.data;
+    } else {
+      contributions = await fetchContributions(username, dateRange.from, dateRange.to);
+
+      // Clean up cache to prevent unlimited memory growth
+      if (apiCache.size > 1000) {
+        for (const [key, value] of apiCache.entries()) {
+          if (now - value.timestamp >= CACHE_TTL) {
+            apiCache.delete(key);
+          }
+        }
+        if (apiCache.size > 1000) {
+          apiCache.clear();
+        }
+      }
+
+      apiCache.set(cacheKey, {
+        timestamp: now,
+        data: contributions
+      });
+    }
     
     const svg = generateSVG(contributions, {
       boxSize: Number(boxSize) || 12,

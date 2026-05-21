@@ -36,7 +36,41 @@ const DEFAULT_COLORS = {
   maxActivity: '#216e39'
 };
 
+function splitDateRange(fromStr, toStr) {
+  const chunks = [];
+  const overallFrom = new Date(fromStr);
+  const overallTo = new Date(toStr);
+  
+  let currentFrom = new Date(overallFrom);
+  
+  while (currentFrom < overallTo) {
+    let currentTo = new Date(currentFrom);
+    currentTo.setUTCDate(currentTo.getUTCDate() + 364); // 364 days is exactly 52 weeks
+    
+    // Set to the end of the day
+    currentTo.setUTCHours(23, 59, 59, 999);
+    
+    if (currentTo > overallTo) {
+      currentTo = new Date(overallTo);
+    }
+    
+    chunks.push({
+      from: currentFrom.toISOString(),
+      to: currentTo.toISOString()
+    });
+    
+    const nextFrom = new Date(currentTo);
+    nextFrom.setUTCDate(nextFrom.getUTCDate() + 1);
+    nextFrom.setUTCHours(0, 0, 0, 0);
+    currentFrom = nextFrom;
+  }
+  
+  return chunks;
+}
+
 async function fetchContributions(username, from, to) {
+  const chunks = splitDateRange(from, to);
+  
   const query = `
     query($username: String!, $from: DateTime!, $to: DateTime!) {
       user(login: $username) {
@@ -59,30 +93,87 @@ async function fetchContributions(username, from, to) {
     throw new Error('GITHUB_TOKEN environment variable is not configured on the server.');
   }
 
-  try {
-    const response = await axios.post('https://api.github.com/graphql', {
-      query,
-      variables: { username, from, to }
-    }, {
-      headers: {
-        'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
-        'Content-Type': 'application/json',
+  // Fetch all chunks in parallel
+  const results = await Promise.all(chunks.map(async (chunk) => {
+    try {
+      const response = await axios.post('https://api.github.com/graphql', {
+        query,
+        variables: { username, from: chunk.from, to: chunk.to }
+      }, {
+        headers: {
+          'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (response.data.errors) {
+        throw new Error(response.data.errors.map(e => e.message).join(', '));
       }
+
+      if (!response.data.data || !response.data.data.user) {
+        throw new Error(`User '${username}' not found on GitHub.`);
+      }
+
+      return response.data.data.user.contributionsCollection.contributionCalendar;
+    } catch (error) {
+      console.error(`Error fetching chunk ${chunk.from} to ${chunk.to}:`, error.message);
+      throw error;
+    }
+  }));
+
+  // Merge the calendar results
+  const daysMap = new Map();
+  let totalContributions = 0;
+
+  results.forEach(calendar => {
+    if (calendar && calendar.weeks) {
+      calendar.weeks.forEach(week => {
+        if (week.contributionDays) {
+          week.contributionDays.forEach(day => {
+            if (!daysMap.has(day.date)) {
+              daysMap.set(day.date, day.contributionCount);
+              totalContributions += day.contributionCount;
+            }
+          });
+        }
+      });
+    }
+  });
+
+  // Reconstruct weeks array spanning from the Sunday before 'from' to the Saturday after 'to'
+  const start = new Date(from);
+  const startDay = start.getUTCDay();
+  start.setUTCDate(start.getUTCDate() - startDay);
+
+  const end = new Date(to);
+  const endDay = end.getUTCDay();
+  end.setUTCDate(end.getUTCDate() + (6 - endDay));
+
+  const weeks = [];
+  let currentWeekDays = [];
+
+  let current = new Date(start);
+  while (current <= end) {
+    const dateStr = current.toISOString().split('T')[0];
+    const contributionCount = daysMap.has(dateStr) ? daysMap.get(dateStr) : 0;
+
+    currentWeekDays.push({
+      date: dateStr,
+      contributionCount
     });
 
-    if (response.data.errors) {
-      throw new Error(response.data.errors.map(e => e.message).join(', '));
+    if (currentWeekDays.length === 7) {
+      weeks.push({ contributionDays: currentWeekDays });
+      currentWeekDays = [];
     }
 
-    if (!response.data.data || !response.data.data.user) {
-      throw new Error(`User '${username}' not found on GitHub.`);
-    }
-
-    return response.data.data.user.contributionsCollection.contributionCalendar;
-  } catch (error) {
-    console.error('Error fetching GitHub contributions:', error.message);
-    throw error;
+    current.setUTCDate(current.getUTCDate() + 1);
   }
+
+  return {
+    totalContributions,
+    weeks
+  };
 }
 
 function interpolateColor(color1, color2, factor) {
@@ -283,8 +374,17 @@ app.get('/api/github-contributions/:username', async (req, res) => {
     let dateRange;
     if (months) {
       dateRange = calculateDateRange(parseInt(months));
-    } else if (from && to) {
-      dateRange = { from, to };
+    } else if (from) {
+      const toDate = to ? new Date(to) : new Date();
+      toDate.setHours(23, 59, 59, 999);
+
+      const fromDate = new Date(from);
+      fromDate.setHours(0, 0, 0, 0);
+
+      dateRange = {
+        from: fromDate.toISOString(),
+        to: toDate.toISOString()
+      };
     } else {
       dateRange = calculateDateRange(12); // Default to 12 months
     }

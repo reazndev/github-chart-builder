@@ -18,14 +18,14 @@ A simple tool to customize your GitHub contribution graph and generate a clean S
 
 - **Interactive Preview:** Type any GitHub username to see their graph instantly.
 - **Custom Themes:** Pick from built-in presets or configure custom Hex colors for active/inactive days.
-- **Tweak Everything:** Adjust months (1-12), box sizes, cell spacing, and border radius.
+- **Tweak Everything:** Adjust months (1-48), box sizes, cell spacing, and border radius.
 - **Unified & Containerized:** Single React + Node application with simple Docker/Compose setup.
 
 ## Query Options
 
 The backend handles parameters directly via URL queries, including:
 
-- `months` (1-12)
+- `months` (1-48)
 - `boxSize` (pixel dimension of grid cells)
 - `boxSpacing` (pixel spacing between grid cells)
 - `borderRadius` (border curves for grid cells)

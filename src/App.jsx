@@ -21,6 +21,10 @@ const App = () => {
   const [copied, setCopied] = useState(false);
   const [debouncedUsername, setDebouncedUsername] = useState(config.username);
   const [imgStatus, setImgStatus] = useState('loading'); // 'loading' | 'success' | 'error' | 'idle'
+  const [durationMode, setDurationMode] = useState('preset'); // 'preset' | 'custom'
+  const [customRange, setCustomRange] = useState({
+    from: '2023-01-01'
+  });
 
   // Debounce username to prevent spamming the GitHub GraphQL API on every keystroke
   useEffect(() => {
@@ -30,12 +34,11 @@ const App = () => {
     return () => clearTimeout(timer);
   }, [config.username]);
 
-  // Update preview URL when configuration or debounced username changes
+  // Update preview URL when configuration, durationMode, customRange or debounced username changes
   useEffect(() => {
     if (!debouncedUsername) return;
 
-    const params = new URLSearchParams({
-      months: config.months.toString(),
+    const baseParams = {
       boxSize: config.boxSize.toString(),
       boxSpacing: config.boxSpacing.toString(),
       borderRadius: config.borderRadius.toString(),
@@ -46,14 +49,24 @@ const App = () => {
       maxActivityColor: config.maxActivityColor,
       showLabels: config.showLabels.toString(),
       labelColor: config.labelColor
-    });
+    };
+
+    if (durationMode === 'preset') {
+      baseParams.months = config.months.toString();
+    } else {
+      baseParams.from = customRange.from;
+    }
+
+    const params = new URLSearchParams(baseParams);
 
     const apiBase = import.meta.env.VITE_API_BASE_URL || window.location.origin;
     const url = `${apiBase}/api/github-contributions/${debouncedUsername}?${params.toString()}`;
     setPreviewUrl(url);
   }, [
     debouncedUsername,
+    durationMode,
     config.months,
+    customRange.from,
     config.boxSize,
     config.boxSpacing,
     config.borderRadius,
@@ -268,20 +281,57 @@ const App = () => {
                     />
                   </div>
 
-                  <div className="slider-group">
-                    <div className="slider-header">
-                      <label className="form-label">Duration</label>
-                      <span className="slider-value">{config.months} months</span>
+                  <div className="form-group">
+                    <label className="form-label">Duration Mode</label>
+                    <div className="tabs-container">
+                      <button
+                        type="button"
+                        onClick={() => setDurationMode('preset')}
+                        className={`tab-btn ${durationMode === 'preset' ? 'active' : ''}`}
+                      >
+                        Recent Months
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDurationMode('custom')}
+                        className={`tab-btn ${durationMode === 'custom' ? 'active' : ''}`}
+                      >
+                        Custom Dates
+                      </button>
                     </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="12"
-                      value={config.months}
-                      onChange={(e) => handleChange('months', parseInt(e.target.value))}
-                      className="slider"
-                    />
                   </div>
+
+                  {durationMode === 'preset' ? (
+                    <div className="slider-group">
+                      <div className="slider-header">
+                        <label className="form-label">Duration</label>
+                        <span className="slider-value">{config.months} months</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="48"
+                        value={config.months}
+                        onChange={(e) => handleChange('months', parseInt(e.target.value))}
+                        className="slider"
+                      />
+                    </div>
+                  ) : (
+                    <div className="form-group">
+                      <label className="form-label">Start Date</label>
+                      <input
+                        type="date"
+                        min="2008-01-01"
+                        max={new Date().toISOString().split('T')[0]}
+                        value={customRange.from}
+                        onChange={(e) => setCustomRange(prev => ({ ...prev, from: e.target.value }))}
+                        className="form-input"
+                      />
+                      <p className="slider-value" style={{ marginTop: '0.5rem', fontSize: '0.75rem', lineHeight: '1.25' }}>
+                        Graph will automatically run from this start date up to today (dynamic).
+                      </p>
+                    </div>
+                  )}
 
                   <div className="slider-group">
                     <div className="slider-header">

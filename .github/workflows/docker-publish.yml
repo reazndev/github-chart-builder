@@ -61,16 +61,23 @@ jobs:
           echo "Waiting 15 seconds before triggering webhook..."
           sleep 15
           
-          # Construct payload
-          PAYLOAD="{\"event\": \"build_complete\", \"status\": \"success\", \"repository\": \"${{ github.repository }}\", \"secret\": \"$KOMODO_WEBHOOK_SECRET\"}"
+          # Construct standard GitHub-style payload
+          PAYLOAD='{"ref": "'"$GITHUB_REF"'", "repository": {"full_name": "'"$GITHUB_REPOSITORY"'"}, "after": "'"$GITHUB_SHA"'"}'
           
-          # Generate GitHub-style HMAC-SHA256 signature using the secret
-          SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "$KOMODO_WEBHOOK_SECRET" | cut -d' ' -f2)
-          
-          # Trigger webhook with the required signature header
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -H "X-Hub-Signature-256: sha256=$SIGNATURE" \
-            -H "X-GitHub-Event: push" \
-            -d "$PAYLOAD" \
-            "$KOMODO_WEBHOOK"
+          if [ -n "$KOMODO_WEBHOOK_SECRET" ]; then
+            # Generate signature and trigger with auth
+            SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "$KOMODO_WEBHOOK_SECRET" | cut -d' ' -f2)
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -H "X-Hub-Signature-256: sha256=$SIGNATURE" \
+              -H "X-GitHub-Event: push" \
+              -d "$PAYLOAD" \
+              "$KOMODO_WEBHOOK"
+          else
+            # Trigger without signature
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -H "X-GitHub-Event: push" \
+              -d "$PAYLOAD" \
+              "$KOMODO_WEBHOOK"
+          fi

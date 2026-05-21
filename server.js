@@ -373,7 +373,7 @@ function calculateDateRange(months = 12) {
   };
 }
 
-// Simple in-memory cache to prevent spamming GitHub API
+// Simple in-memory cache to prevent spamming GitHub API (helps scale embeds seamlessly)
 const apiCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes in milliseconds
 

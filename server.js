@@ -68,10 +68,10 @@ function splitDateRange(fromStr, toStr) {
   return chunks;
 }
 
-async function fetchContributions(username, from, to) {
+async function fetchContributions(username, from, to, repo = null) {
   const chunks = splitDateRange(from, to);
   
-  const query = `
+  const calendarQuery = `
     query($username: String!, $from: DateTime!, $to: DateTime!) {
       user(login: $username) {
         contributionsCollection(from: $from, to: $to) {
@@ -88,6 +88,58 @@ async function fetchContributions(username, from, to) {
       }
     }
   `;
+
+  const repoQuery = `
+    query($username: String!, $from: DateTime!, $to: DateTime!) {
+      user(login: $username) {
+        contributionsCollection(from: $from, to: $to) {
+          commitContributionsByRepository(maxRepositories: 100) {
+            repository {
+              nameWithOwner
+            }
+            contributions(first: 100) {
+              nodes {
+                occurredAt
+                commitCount
+              }
+            }
+          }
+          issueContributionsByRepository(maxRepositories: 100) {
+            repository {
+              nameWithOwner
+            }
+            contributions(first: 100) {
+              nodes {
+                occurredAt
+              }
+            }
+          }
+          pullRequestContributionsByRepository(maxRepositories: 100) {
+            repository {
+              nameWithOwner
+            }
+            contributions(first: 100) {
+              nodes {
+                occurredAt
+              }
+            }
+          }
+          pullRequestReviewContributionsByRepository(maxRepositories: 100) {
+            repository {
+              nameWithOwner
+            }
+            contributions(first: 100) {
+              nodes {
+                occurredAt
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const query = repo ? repoQuery : calendarQuery;
 
   if (!process.env.GITHUB_TOKEN) {
     throw new Error('GITHUB_TOKEN environment variable is not configured on the server.');
@@ -115,7 +167,7 @@ async function fetchContributions(username, from, to) {
         throw new Error(`User '${username}' not found on GitHub.`);
       }
 
-      return response.data.data.user.contributionsCollection.contributionCalendar;
+      return response.data.data.user.contributionsCollection;
     } catch (error) {
       console.error(`Error fetching chunk ${chunk.from} to ${chunk.to}:`, error.message);
       throw error;
@@ -126,20 +178,54 @@ async function fetchContributions(username, from, to) {
   const daysMap = new Map();
   let totalContributions = 0;
 
-  results.forEach(calendar => {
-    if (calendar && calendar.weeks) {
-      calendar.weeks.forEach(week => {
-        if (week.contributionDays) {
-          week.contributionDays.forEach(day => {
-            if (!daysMap.has(day.date)) {
-              daysMap.set(day.date, day.contributionCount);
-              totalContributions += day.contributionCount;
+  if (repo) {
+    // Support multiple comma-separated repositories (e.g. "react, facebook/react")
+    const targetRepos = repo.split(',').map(r => {
+      const trimmed = r.trim();
+      return trimmed.includes('/') ? trimmed.toLowerCase() : `${username}/${trimmed}`.toLowerCase();
+    });
+
+    results.forEach(collection => {
+      if (!collection) return;
+
+      const processRepoNodes = (repoList, isCommit = false) => {
+        if (!repoList) return;
+        repoList.forEach(item => {
+          if (item.repository && targetRepos.includes(item.repository.nameWithOwner.toLowerCase())) {
+            if (item.contributions && item.contributions.nodes) {
+              item.contributions.nodes.forEach(node => {
+                const dateStr = node.occurredAt.split('T')[0];
+                const count = isCommit ? (node.commitCount || 1) : 1;
+                daysMap.set(dateStr, (daysMap.get(dateStr) || 0) + count);
+                totalContributions += count;
+              });
             }
-          });
-        }
-      });
-    }
-  });
+          }
+        });
+      };
+
+      processRepoNodes(collection.commitContributionsByRepository, true);
+      processRepoNodes(collection.issueContributionsByRepository);
+      processRepoNodes(collection.pullRequestContributionsByRepository);
+      processRepoNodes(collection.pullRequestReviewContributionsByRepository);
+    });
+  } else {
+    results.forEach(collection => {
+      const calendar = collection ? collection.contributionCalendar : null;
+      if (calendar && calendar.weeks) {
+        calendar.weeks.forEach(week => {
+          if (week.contributionDays) {
+            week.contributionDays.forEach(day => {
+              if (!daysMap.has(day.date)) {
+                daysMap.set(day.date, day.contributionCount);
+                totalContributions += day.contributionCount;
+              }
+            });
+          }
+        });
+      }
+    });
+  }
 
   // Reconstruct weeks array spanning from the Sunday before 'from' to the Saturday after 'to'
   const start = new Date(from);
@@ -232,6 +318,7 @@ function generateSVG(contributions, options = {}) {
     minActivityColor = DEFAULT_COLORS.minActivity,
     maxActivityColor = DEFAULT_COLORS.maxActivity,
     showLabels = true,
+    showYears = false,
     labelColor = '#24292f',
     ignoreOutliers = false
   } = options;
@@ -285,6 +372,7 @@ function generateSVG(contributions, options = {}) {
   // Add month labels if enabled
   if (showLabels) {
     let currentMonth = '';
+    let currentYear = '';
     let monthStartX = 0;
     let monthLabelWidth = 0;
     
@@ -292,15 +380,20 @@ function generateSVG(contributions, options = {}) {
       if (week.contributionDays && week.contributionDays.length > 0) {
         const firstDayOfWeek = week.contributionDays[0].date;
         const month = getMonthLabel(firstDayOfWeek);
+        const year = new Date(firstDayOfWeek).getFullYear().toString();
         
         if (month !== currentMonth) {
           // If it's a new month, add the label
           if (monthLabelWidth > 0) {
             // Add the previous month label centered over its weeks
             const labelX = monthStartX + (monthLabelWidth - 30) / 2; // 30 is approximate text width
-            svg += `<text x="${labelX}" y="15" font-family="Arial" font-size="12" fill="${labelColor}">${currentMonth}</text>`;
+            const labelText = (showYears && currentMonth === 'Jan') 
+              ? `${currentMonth} '${currentYear.substring(2)}` 
+              : currentMonth;
+            svg += `<text x="${labelX}" y="15" font-family="Arial" font-size="12" fill="${labelColor}">${labelText}</text>`;
           }
           currentMonth = month;
+          currentYear = year;
           monthStartX = weekIndex * (boxWidth + validBoxSpacing);
           monthLabelWidth = 0;
         }
@@ -311,7 +404,10 @@ function generateSVG(contributions, options = {}) {
     // Add the last month label
     if (monthLabelWidth > 0) {
       const labelX = monthStartX + (monthLabelWidth - 30) / 2;
-      svg += `<text x="${labelX}" y="15" font-family="Arial" font-size="12" fill="${labelColor}">${currentMonth}</text>`;
+      const labelText = (showYears && currentMonth === 'Jan') 
+        ? `${currentMonth} '${currentYear.substring(2)}` 
+        : currentMonth;
+      svg += `<text x="${labelX}" y="15" font-family="Arial" font-size="12" fill="${labelColor}">${labelText}</text>`;
     }
   }
 
@@ -375,17 +471,86 @@ function calculateDateRange(months = 12) {
 
 // Simple in-memory cache to prevent spamming GitHub API (helps scale embeds seamlessly)
 const apiCache = new Map();
+const repoCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes in milliseconds
 
-function getCacheKey(username, from, to) {
-  return `${username}:${from}:${to}`;
+function getCacheKey(username, from, to, repo = null) {
+  return `${username}:${from}:${to}:${repo || ''}`;
 }
+
+// API Endpoint to fetch public repositories for a given user (for autocomplete)
+app.get('/api/github-repos/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    const cacheKey = username.toLowerCase();
+    const now = Date.now();
+    const cachedEntry = repoCache.get(cacheKey);
+
+    if (cachedEntry && (now - cachedEntry.timestamp < CACHE_TTL)) {
+      return res.json(cachedEntry.data);
+    }
+
+    if (!process.env.GITHUB_TOKEN) {
+      throw new Error('GITHUB_TOKEN environment variable is not configured.');
+    }
+
+    // Fetch up to 100 repositories sorted by recently pushed/updated
+    const query = `
+      query($username: String!) {
+        user(login: $username) {
+          repositories(first: 100, privacy: PUBLIC, orderBy: {field: PUSHED_AT, direction: DESC}) {
+            nodes {
+              nameWithOwner
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await axios.post('https://api.github.com/graphql', {
+      query,
+      variables: { username }
+    }, {
+      headers: {
+        'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      timeout: 10000
+    });
+
+    if (response.data.errors) {
+      // Return empty array if user not found or has errors, rather than throwing hard 500
+      if (response.data.errors.some(e => e.type === 'NOT_FOUND' || e.message.includes('Could not resolve to a User'))) {
+        return res.json([]);
+      }
+      throw new Error(response.data.errors.map(e => e.message).join(', '));
+    }
+
+    if (!response.data.data || !response.data.data.user || !response.data.data.user.repositories) {
+      return res.json([]);
+    }
+
+    const repos = response.data.data.user.repositories.nodes.map(n => n.nameWithOwner);
+    
+    // Cache the result
+    repoCache.set(cacheKey, {
+      timestamp: now,
+      data: repos
+    });
+
+    res.json(repos);
+  } catch (error) {
+    console.error('Error fetching user repositories:', error.message);
+    res.status(500).json({ error: 'Failed to fetch repositories', details: error.message });
+  }
+});
 
 // API Endpoint for GitHub Contributions SVG
 app.get('/api/github-contributions/:username', async (req, res) => {
   try {
     const { username } = req.params;
     const { 
+      repo,
       months,
       from,
       to,
@@ -397,6 +562,7 @@ app.get('/api/github-contributions/:username', async (req, res) => {
       minActivityColor = '#e8cb38',
       maxActivityColor = '#5649cc',
       showLabels = 'true',
+      showYears = 'false',
       labelColor = '#24292f',
       ignoreOutliers = 'false'
     } = req.query;
@@ -420,7 +586,7 @@ app.get('/api/github-contributions/:username', async (req, res) => {
       dateRange = calculateDateRange(12); // Default to 12 months
     }
 
-    const cacheKey = getCacheKey(username, dateRange.from, dateRange.to);
+    const cacheKey = getCacheKey(username, dateRange.from, dateRange.to, repo);
     const cachedEntry = apiCache.get(cacheKey);
     const now = Date.now();
 
@@ -428,7 +594,7 @@ app.get('/api/github-contributions/:username', async (req, res) => {
     if (cachedEntry && (now - cachedEntry.timestamp < CACHE_TTL)) {
       contributions = cachedEntry.data;
     } else {
-      contributions = await fetchContributions(username, dateRange.from, dateRange.to);
+      contributions = await fetchContributions(username, dateRange.from, dateRange.to, repo);
 
       // Clean up cache to prevent unlimited memory growth
       if (apiCache.size > 1000) {
@@ -457,6 +623,7 @@ app.get('/api/github-contributions/:username', async (req, res) => {
       minActivityColor,
       maxActivityColor,
       showLabels: showLabels !== 'false',
+      showYears: showYears === 'true',
       labelColor,
       ignoreOutliers: ignoreOutliers === 'true'
     });

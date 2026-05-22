@@ -4,6 +4,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -26,6 +27,57 @@ app.use(express.json());
 // (This enables the server to start and serve the frontend even without a token, or show nice API errors)
 if (!process.env.GITHUB_TOKEN) {
   console.warn('Warning: GITHUB_TOKEN is not set in .env file. API queries will fail.');
+}
+
+// Initialize secure AES-256 encryption key
+let rawKey = process.env.ENCRYPTION_KEY;
+if (!rawKey) {
+  console.warn('Warning: ENCRYPTION_KEY is not set in .env. Generating a random key for this session (tokens will invalidate on server restart).');
+  rawKey = crypto.randomBytes(32).toString('hex');
+}
+const encryptionKeyBuffer = crypto.createHash('sha256').update(rawKey).digest();
+
+const IV_LENGTH = 12; // Standard for AES-GCM
+
+function encryptToken(token, username) {
+  try {
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKeyBuffer, iv);
+    
+    const payload = JSON.stringify({ token, username, createdAt: Date.now() });
+    let encrypted = cipher.update(payload, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    const authTag = cipher.getAuthTag().toString('hex');
+    return `${iv.toString('hex')}:${encrypted}:${authTag}`;
+  } catch (error) {
+    console.error('Encryption failed:', error.message);
+    throw new Error('Encryption failed');
+  }
+}
+
+function decryptToken(encryptedString) {
+  try {
+    if (!encryptedString) return null;
+    const parts = encryptedString.split(':');
+    if (parts.length !== 3) return null;
+
+    const [ivHex, encryptedHex, authTagHex] = parts;
+    const iv = Buffer.from(ivHex, 'hex');
+    const encrypted = Buffer.from(encryptedHex, 'hex');
+    const authTag = Buffer.from(authTagHex, 'hex');
+
+    const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKeyBuffer, iv);
+    decipher.setAuthTag(authTag);
+
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+
+    return JSON.parse(decrypted);
+  } catch (error) {
+    console.error('Decryption failed:', error.message);
+    return null;
+  }
 }
 
 const DEFAULT_COLORS = {
@@ -68,7 +120,7 @@ function splitDateRange(fromStr, toStr) {
   return chunks;
 }
 
-async function fetchContributions(username, from, to, repo = null) {
+async function fetchContributions(username, from, to, repo = null, accessToken = null) {
   const chunks = splitDateRange(from, to);
   
   const calendarQuery = `
@@ -141,8 +193,9 @@ async function fetchContributions(username, from, to, repo = null) {
 
   const query = repo ? repoQuery : calendarQuery;
 
-  if (!process.env.GITHUB_TOKEN) {
-    throw new Error('GITHUB_TOKEN environment variable is not configured on the server.');
+  const tokenToUse = accessToken || process.env.GITHUB_TOKEN;
+  if (!tokenToUse) {
+    throw new Error('GitHub Authorization token is not configured on the server.');
   }
 
   // Fetch all chunks in parallel
@@ -153,7 +206,7 @@ async function fetchContributions(username, from, to, repo = null) {
         variables: { username, from: chunk.from, to: chunk.to }
       }, {
         headers: {
-          'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+          'Authorization': `Bearer ${tokenToUse}`,
           'Content-Type': 'application/json',
         },
         timeout: 15000
@@ -474,15 +527,98 @@ const apiCache = new Map();
 const repoCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes in milliseconds
 
-function getCacheKey(username, from, to, repo = null) {
-  return `${username}:${from}:${to}:${repo || ''}`;
+function getCacheKey(username, from, to, repo = null, token = null) {
+  const tokenHash = token ? crypto.createHash('md5').update(token).digest('hex') : '';
+  return `${username}:${from}:${to}:${repo || ''}:${tokenHash}`;
 }
 
-// API Endpoint to fetch public repositories for a given user (for autocomplete)
+// GitHub OAuth Authorization Endpoint
+app.get('/api/auth/github', (req, res) => {
+  const clientID = process.env.GITHUB_CLIENT_ID;
+  if (!clientID) {
+    return res.status(500).json({ error: 'GITHUB_CLIENT_ID is not configured on the server.' });
+  }
+  const redirectURI = process.env.GITHUB_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/auth/github/callback`;
+  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientID}&redirect_uri=${encodeURIComponent(redirectURI)}&scope=repo,read:user`;
+  res.redirect(githubAuthUrl);
+});
+
+// GitHub OAuth Callback Endpoint
+app.get('/api/auth/github/callback', async (req, res) => {
+  const { code } = req.query;
+  if (!code) {
+    return res.redirect('/?error=no_code_provided');
+  }
+
+  const clientID = process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+
+  if (!clientID || !clientSecret) {
+    console.error('OAuth credentials (GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET) missing.');
+    return res.redirect('/?error=oauth_config_missing');
+  }
+
+  try {
+    // 1. Exchange OAuth code for Access Token
+    const tokenResponse = await axios.post('https://github.com/login/oauth/access_token', {
+      client_id: clientID,
+      client_secret: clientSecret,
+      code
+    }, {
+      headers: { Accept: 'application/json' },
+      timeout: 10000
+    });
+
+    const accessToken = tokenResponse.data.access_token;
+    if (!accessToken) {
+      console.error('GitHub token exchange response failed:', tokenResponse.data);
+      return res.redirect(`/?error=token_exchange_failed&details=${encodeURIComponent(tokenResponse.data.error_description || tokenResponse.data.error || 'No token received')}`);
+    }
+
+    // 2. Fetch user's profile to obtain username/login
+    const userResponse = await axios.get('https://api.github.com/user', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: 10000
+    });
+
+    const username = userResponse.data.login;
+    if (!username) {
+      return res.redirect('/?error=user_profile_failed');
+    }
+
+    // 3. Encrypt the token with username metadata
+    const encryptedPayload = encryptToken(accessToken, username);
+
+    // 4. Redirect to frontend with encrypted token and username in URL query params
+    res.redirect(`/?token=${encodeURIComponent(encryptedPayload)}&username=${encodeURIComponent(username)}`);
+  } catch (error) {
+    console.error('OAuth callback error:', error.message);
+    res.redirect(`/?error=oauth_failed&details=${encodeURIComponent(error.message)}`);
+  }
+});
+
+// API Endpoint to fetch repositories for a given user (for autocomplete)
 app.get('/api/github-repos/:username', async (req, res) => {
   try {
     const { username } = req.params;
-    const cacheKey = username.toLowerCase();
+    
+    // Extract encrypted token from Authorization header or query parameter
+    let encryptedToken = req.query.token;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      encryptedToken = authHeader.substring(7);
+    }
+
+    let accessToken = null;
+    if (encryptedToken) {
+      const decrypted = decryptToken(encryptedToken);
+      if (decrypted) {
+        accessToken = decrypted.token;
+      }
+    }
+
+    const tokenHash = accessToken ? crypto.createHash('md5').update(accessToken).digest('hex') : '';
+    const cacheKey = `${username.toLowerCase()}:${tokenHash}`;
     const now = Date.now();
     const cachedEntry = repoCache.get(cacheKey);
 
@@ -490,15 +626,17 @@ app.get('/api/github-repos/:username', async (req, res) => {
       return res.json(cachedEntry.data);
     }
 
-    if (!process.env.GITHUB_TOKEN) {
-      throw new Error('GITHUB_TOKEN environment variable is not configured.');
+    const tokenToUse = accessToken || process.env.GITHUB_TOKEN;
+    if (!tokenToUse) {
+      throw new Error('GitHub Authorization token is not configured.');
     }
 
     // Fetch up to 100 repositories sorted by recently pushed/updated
+    // (Omit privacy filter to get both public and private repos if authorized)
     const query = `
       query($username: String!) {
         user(login: $username) {
-          repositories(first: 100, privacy: PUBLIC, orderBy: {field: PUSHED_AT, direction: DESC}) {
+          repositories(first: 100, orderBy: {field: PUSHED_AT, direction: DESC}) {
             nodes {
               nameWithOwner
             }
@@ -512,7 +650,7 @@ app.get('/api/github-repos/:username', async (req, res) => {
       variables: { username }
     }, {
       headers: {
-        'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`,
+        'Authorization': `Bearer ${tokenToUse}`,
         'Content-Type': 'application/json',
       },
       timeout: 10000
@@ -551,6 +689,7 @@ app.get('/api/github-contributions/:username', async (req, res) => {
     const { username } = req.params;
     const { 
       repo,
+      token,
       months,
       from,
       to,
@@ -586,7 +725,16 @@ app.get('/api/github-contributions/:username', async (req, res) => {
       dateRange = calculateDateRange(12); // Default to 12 months
     }
 
-    const cacheKey = getCacheKey(username, dateRange.from, dateRange.to, repo);
+    // Decrypt the OAuth token if supplied
+    let accessToken = null;
+    if (token) {
+      const decrypted = decryptToken(token);
+      if (decrypted) {
+        accessToken = decrypted.token;
+      }
+    }
+
+    const cacheKey = getCacheKey(username, dateRange.from, dateRange.to, repo, accessToken);
     const cachedEntry = apiCache.get(cacheKey);
     const now = Date.now();
 
@@ -594,7 +742,7 @@ app.get('/api/github-contributions/:username', async (req, res) => {
     if (cachedEntry && (now - cachedEntry.timestamp < CACHE_TTL)) {
       contributions = cachedEntry.data;
     } else {
-      contributions = await fetchContributions(username, dateRange.from, dateRange.to, repo);
+      contributions = await fetchContributions(username, dateRange.from, dateRange.to, repo, accessToken);
 
       // Clean up cache to prevent unlimited memory growth
       if (apiCache.size > 1000) {

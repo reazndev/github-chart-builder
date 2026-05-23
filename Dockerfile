@@ -27,6 +27,12 @@ WORKDIR /app
 # Set environment to production
 ENV NODE_ENV=production
 ENV PORT=8030
+ENV GITHUB_TOKEN=""
+ENV GITHUB_CLIENT_ID=""
+ENV GITHUB_CLIENT_SECRET=""
+ENV GITHUB_REDIRECT_URI=""
+ENV ENCRYPTION_KEY=""
+
 
 # Copy package configurations and production node_modules from builder stage
 COPY --from=builder /app/package.json ./

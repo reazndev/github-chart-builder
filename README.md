@@ -76,12 +76,13 @@ To run the application locally, you will need a personal GitHub access token (mi
 
 To build and host using Docker Compose:
 
-1. Copy `.env.example` to `.env` and specify your `GITHUB_TOKEN`.
+1. Copy `.env.example` to `.env` and specify your `GITHUB_TOKEN` (required for querying public contribution graphs). If you want to support private repositories via GitHub OAuth2, also configure `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GITHUB_REDIRECT_URI`, and a secure `ENCRYPTION_KEY`.
 2. Spin up the container stack:
    ```bash
    docker compose up -d
    ```
    *The container exposes port `8030`, serving both the API endpoints and the optimized built frontend assets.*
+
 
 ---
 

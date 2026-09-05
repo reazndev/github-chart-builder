@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import Header from './components/Header';
+import About from './components/About';
+import ThemeStore from './components/ThemeStore';
+import PublishThemeCard from './components/PublishThemeCard';
 import PreviewCard from './components/PreviewCard';
 import UrlCard from './components/UrlCard';
 import ColorSettingsCard from './components/ColorSettingsCard';
@@ -10,7 +13,14 @@ import Footer from './components/Footer';
 import { PRESETS } from './constants/presets';
 import { useRepoList } from './hooks/useRepoList';
 
+const getRoute = () => {
+  if (window.location.pathname === '/about') return 'about';
+  if (window.location.pathname === '/themes') return 'themes';
+  return 'builder';
+};
+
 const App = () => {
+  const [route, setRoute] = useState(getRoute());
   const [auth, setAuth] = useState({
     token: localStorage.getItem('gh_chart_token') || '',
     username: localStorage.getItem('gh_chart_username') || ''
@@ -66,6 +76,26 @@ const App = () => {
     auth.token,
     config.username
   );
+
+  useEffect(() => {
+    const onPopState = () => setRoute(getRoute());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  const navigate = (to) => {
+    window.history.pushState({}, '', to);
+    setRoute(getRoute());
+    window.scrollTo(0, 0);
+  };
+
+  useEffect(() => {
+    document.title = route === 'about'
+      ? 'About — GitHub Contributions Chart Builder'
+      : route === 'themes'
+        ? 'Community Themes — GitHub Contributions Chart Builder'
+        : 'GitHub Contributions Chart Builder — Custom SVG for README & Portfolio';
+  }, [route]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -225,26 +255,36 @@ const App = () => {
     );
   };
 
+  const applyTheme = (theme) => {
+    setConfig(prev => ({
+      ...prev,
+      inactiveColor: theme.inactiveColor,
+      minActivityColor: theme.minActivityColor,
+      maxActivityColor: theme.maxActivityColor
+    }));
+    navigate('/');
+  };
+
   const hasInput = chartMode === 'user'
     ? !!config.username
     : !!config.repo && config.repo.split(',')[0].trim().includes('/');
 
-  const appStyles = {
-    '--preset-inactive': config.inactiveColor,
-    '--preset-min': config.minActivityColor,
-    '--preset-max': config.maxActivityColor,
-    '--preset-label': config.labelColor,
-  };
-
   return (
-    <div className="app" style={appStyles}>
+    <div className="app">
       <Header
         auth={auth}
         handleLogin={handleLogin}
         handleLogout={handleLogout}
+        route={route}
+        navigate={navigate}
       />
 
-      <div className="main-container">
+      <main className="main-container">
+        {route === 'about' ? (
+          <About onBack={() => navigate('/')} />
+        ) : route === 'themes' ? (
+          <ThemeStore onApply={applyTheme} />
+        ) : (
         <div className="grid">
           <div className="space-y-6">
             <PreviewCard
@@ -264,6 +304,8 @@ const App = () => {
               config={config}
               handleChange={handleChange}
             />
+
+            <PublishThemeCard config={config} navigate={navigate} />
           </div>
 
           <div className="space-y-6">
@@ -294,12 +336,14 @@ const App = () => {
               presets={PRESETS}
               applyPreset={applyPreset}
               isPresetSelected={isPresetSelected}
+              navigate={navigate}
             />
           </div>
         </div>
-      </div>
+        )}
+      </main>
 
-      <Footer />
+      <Footer navigate={navigate} />
     </div>
   );
 };

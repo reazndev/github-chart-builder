@@ -1,12 +1,12 @@
 import React from 'react';
 import { Palette } from 'lucide-react';
 
-const PresetsCard = ({ presets, applyPreset, isPresetSelected }) => {
+const PresetsCard = ({ presets, applyPreset, isPresetSelected, navigate }) => {
   return (
-    <div className="card">
+    <section className="card" aria-labelledby="presets-title">
       <div className="card-header">
-        <Palette className="card-icon" />
-        <h2 className="card-title">Presets</h2>
+        <Palette className="card-icon" aria-hidden="true" />
+        <h2 className="card-title" id="presets-title">Presets</h2>
       </div>
       <div className="card-content">
         <div className="preset-grid">
@@ -20,8 +20,15 @@ const PresetsCard = ({ presets, applyPreset, isPresetSelected }) => {
             </button>
           ))}
         </div>
+        <p className="about-text" style={{ marginTop: '1rem' }}>
+          Find community-made templates{' '}
+          <button type="button" className="inline-link link-btn" onClick={() => navigate('/themes')}>
+            here
+          </button>
+          .
+        </p>
       </div>
-    </div>
+    </section>
   );
 };
 

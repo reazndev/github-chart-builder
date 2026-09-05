@@ -15,6 +15,10 @@ dist-ssr
 .env.*
 !.env.example
 
+# Community theme store data (user content, not source)
+data/*.json
+!data/.gitkeep
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

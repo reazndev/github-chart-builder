@@ -14,4 +14,7 @@ services:
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
       - GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - THEME_SALT=${THEME_SALT:-${ENCRYPTION_KEY}}
+    volumes:
+      - ./data:/app/data
 

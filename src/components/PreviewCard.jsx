@@ -2,22 +2,22 @@ import React from 'react';
 
 const PreviewCard = ({ hasInput, imgStatus, svgContent, chartMode }) => {
   return (
-    <div className="card">
+    <section className="card" aria-labelledby="preview-title">
       <div className="card-header">
-        <h2 className="card-title">Preview</h2>
+        <h2 className="card-title" id="preview-title">Preview</h2>
       </div>
       <div className="card-content">
         <div className="preview-container">
           {hasInput ? (
             <>
               {imgStatus === 'loading' && (
-                <div className="preview-loading">
-                  <div className="spinner"></div>
+                <div className="preview-loading" role="status">
+                  <div className="spinner" aria-hidden="true"></div>
                   <p>Fetching contributions...</p>
                 </div>
               )}
               {imgStatus === 'error' && (
-                <div className="preview-error">
+                <div className="preview-error" role="alert">
                   Unable to load contributions chart. Please check the {chartMode === 'user' ? 'username' : 'repositories'} or try again later.
                 </div>
               )}
@@ -25,6 +25,8 @@ const PreviewCard = ({ hasInput, imgStatus, svgContent, chartMode }) => {
                 <div
                   className="preview-svg-container"
                   style={{ display: 'block', maxWidth: '100%', overflowX: 'auto' }}
+                  role="img"
+                  aria-label="GitHub contributions chart preview"
                   dangerouslySetInnerHTML={{ __html: svgContent }}
                 />
               )}
@@ -38,7 +40,7 @@ const PreviewCard = ({ hasInput, imgStatus, svgContent, chartMode }) => {
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

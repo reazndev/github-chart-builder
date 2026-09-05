@@ -1,9 +1,8 @@
 import React from 'react';
-import { Settings, Lock } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import RepoInputs from './RepoInputs';
 
 const SettingsCard = ({
-  auth,
   config,
   handleChange,
   chartMode,
@@ -25,29 +24,21 @@ const SettingsCard = ({
   handleSelectSuggestion
 }) => {
   return (
-    <div className="card">
+    <section className="card" aria-labelledby="settings-title">
       <div className="card-header">
-        <Settings className="card-icon" />
-        <h2 className="card-title">Settings</h2>
+        <Settings className="card-icon" aria-hidden="true" />
+        <h2 className="card-title" id="settings-title">Settings</h2>
       </div>
 
       <div className="card-content">
         <div className="space-y-5">
-          {!auth.token && (
-            <div className="sidebar-auth-tip">
-              <Lock className="tip-icon" />
-              <div>
-                <p className="tip-title">Private Repositories</p>
-                <p className="tip-text">
-                  Want to create charts for private repos? Authenticate via the <strong>Include Private Repos</strong> button in the header.
-                </p>
-              </div>
-            </div>
-          )}
-          
           <div className="form-group">
             <label className="form-label">Chart Mode</label>
             <div className="tabs-container">
+              <span
+                aria-hidden="true"
+                className={`tab-indicator ${chartMode === 'repo' ? 'is-right' : 'is-left'}`}
+              />
               <button
                 type="button"
                 onClick={() => setChartMode('user')}
@@ -65,8 +56,8 @@ const SettingsCard = ({
             </div>
           </div>
 
-          {chartMode === 'user' && (
-            <div className="form-group">
+          {chartMode === 'user' ? (
+            <div key="user" className="form-group">
               <label className="form-label">Username</label>
               <input
                 type="text"
@@ -76,10 +67,9 @@ const SettingsCard = ({
                 placeholder="github-username"
               />
             </div>
-          )}
-
-          {chartMode === 'repo' && (
-            <RepoInputs
+          ) : (
+            <div key="repo">
+              <RepoInputs
               repoList={repoList}
               handleRepoChange={handleRepoChange}
               handleRemoveRepo={handleRemoveRepo}
@@ -91,12 +81,17 @@ const SettingsCard = ({
               getSuggestions={getSuggestions}
               handleKeyDown={handleKeyDown}
               handleSelectSuggestion={handleSelectSuggestion}
-            />
+              />
+            </div>
           )}
 
           <div className="form-group">
             <label className="form-label">Duration Mode</label>
             <div className="tabs-container">
+              <span
+                aria-hidden="true"
+                className={`tab-indicator ${durationMode === 'custom' ? 'is-right' : 'is-left'}`}
+              />
               <button
                 type="button"
                 onClick={() => setDurationMode('preset')}
@@ -115,7 +110,7 @@ const SettingsCard = ({
           </div>
 
           {durationMode === 'preset' ? (
-            <div className="slider-group">
+            <div key="preset" className="slider-group">
               <div className="slider-header">
                 <label className="form-label">Duration</label>
                 <span className="slider-value">{config.months} months</span>
@@ -130,7 +125,7 @@ const SettingsCard = ({
               />
             </div>
           ) : (
-            <div className="form-group">
+            <div key="custom" className="form-group">
               <label className="form-label">Start Date</label>
               <input
                 type="date"
@@ -194,6 +189,10 @@ const SettingsCard = ({
           <div className="toggle-container">
             <label className="form-label">Month Labels</label>
             <button
+              type="button"
+              role="switch"
+              aria-checked={config.showLabels}
+              aria-label="Toggle month labels"
               onClick={() => handleChange('showLabels', !config.showLabels)}
               className={`toggle-button ${config.showLabels ? 'active' : 'inactive'}`}
             >
@@ -210,6 +209,9 @@ const SettingsCard = ({
             </div>
             <button
               type="button"
+              role="switch"
+              aria-checked={config.showYears}
+              aria-label="Toggle year labels"
               onClick={() => handleChange('showYears', !config.showYears)}
               className={`toggle-button ${config.showYears ? 'active' : 'inactive'}`}
             >
@@ -226,6 +228,9 @@ const SettingsCard = ({
             </div>
             <button
               type="button"
+              role="switch"
+              aria-checked={config.ignoreOutliers}
+              aria-label="Toggle ignore outliers"
               onClick={() => handleChange('ignoreOutliers', !config.ignoreOutliers)}
               className={`toggle-button ${config.ignoreOutliers ? 'active' : 'inactive'}`}
             >
@@ -234,7 +239,7 @@ const SettingsCard = ({
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

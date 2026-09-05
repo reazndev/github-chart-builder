@@ -1,0 +1,10 @@
+{
+  "name": "GitHub Chart Builder",
+  "short_name": "GH Charts",
+  "description": "Customizable SVG GitHub contribution charts for README and portfolio.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#171717",
+  "icons": [{ "src": "/favicon.png", "sizes": "512x512", "type": "image/png" }]
+}

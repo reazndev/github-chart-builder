@@ -32,6 +32,7 @@ ENV GITHUB_CLIENT_ID=""
 ENV GITHUB_CLIENT_SECRET=""
 ENV GITHUB_REDIRECT_URI=""
 ENV ENCRYPTION_KEY=""
+ENV THEME_SALT=""
 
 
 # Copy package configurations and production node_modules from builder stage
@@ -41,6 +42,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 # Copy backend Express server
 COPY --from=builder /app/server.js ./server.js
+# Writable dir for the community theme store (backed by a volume in compose)
+RUN mkdir -p /app/data
 
 # Expose the API and web serving port
 EXPOSE 8030

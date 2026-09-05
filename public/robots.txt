@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Allow: /llms.txt
+Allow: /openapi.json
+Allow: /api/github-contributions/
+Allow: /api/github-repos/
+Disallow: /api/auth/
+Sitemap: https://gh.ruu.by/sitemap.xml

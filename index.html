@@ -2,11 +2,54 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>github-chart-builder</title>
+    <title>GitHub Contributions Chart Builder — Custom SVG for README & Portfolio</title>
+    <meta name="description" content="Generate customizable SVG GitHub contribution charts for your README or portfolio. Pick themes, date ranges, repo filters, and embed with one URL." />
+    <meta name="author" content="reazndev" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#171717" />
+    <link rel="canonical" href="https://gh.ruu.by/" />
+
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="GitHub Chart Builder" />
+    <meta property="og:title" content="GitHub Contributions Chart Builder" />
+    <meta property="og:description" content="Customizable SVG contribution charts for your GitHub profile, README, or portfolio." />
+    <meta property="og:url" content="https://gh.ruu.by/" />
+    <meta property="og:image" content="https://gh.ruu.by/og-image.png" />
+    <meta property="og:image:alt" content="Preview of a GitHub contributions chart" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="GitHub Contributions Chart Builder" />
+    <meta name="twitter:description" content="Build and embed custom GitHub contribution SVGs with one URL." />
+    <meta name="twitter:image" content="https://gh.ruu.by/og-image.png" />
+
+    <link rel="preconnect" href="https://api.github.com" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "GitHub Contributions Chart Builder",
+      "url": "https://gh.ruu.by/",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Any",
+      "description": "Generate customizable SVG GitHub contribution charts for READMEs and portfolios.",
+      "author": { "@type": "Person", "name": "reazndev", "url": "https://github.com/reazndev" },
+      "offers": { "@type": "Offer", "price": "0" }
+    }
+    </script>
   </head>
   <body>
+    <noscript>
+      <main style="max-width:640px;margin:4rem auto;font-family:sans-serif;padding:0 1rem">
+        <h1>GitHub Contributions Chart Builder</h1>
+        <p>Generate customizable SVG contribution charts via <code>/api/github-contributions/:username</code>. Enable JavaScript to use the interactive builder, or see <a href="/llms.txt">llms.txt</a> and <a href="/about">About</a>.</p>
+      </main>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

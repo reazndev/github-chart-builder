@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -419,8 +420,10 @@ function generateSVG(contributions, options = {}) {
   // Generate color gradient
   const activityColors = generateColorGradient(minActivityColor, maxActivityColor, 4);
   
-  let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" 
-             xmlns="http://www.w3.org/2000/svg" style="background-color: ${backgroundColor}">`;
+  let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="GitHub contributions chart"
+             xmlns="http://www.w3.org/2000/svg" style="background-color: ${backgroundColor}">
+  <title>GitHub contributions chart</title>
+  <desc>Contribution activity grid, darker cells mean more contributions.</desc>`;
 
   // Add month labels if enabled
   if (showLabels) {
@@ -534,6 +537,7 @@ function getCacheKey(username, from, to, repo = null, token = null) {
 
 // GitHub OAuth Authorization Endpoint
 app.get('/api/auth/github', (req, res) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   const clientID = process.env.GITHUB_CLIENT_ID;
   if (!clientID) {
     return res.status(500).json({ error: 'GITHUB_CLIENT_ID is not configured on the server.' });
@@ -785,8 +789,161 @@ app.get('/api/github-contributions/:username', async (req, res) => {
   }
 });
 
+// ---- Community theme store (file-backed, no new deps) ----
+const THEMES_FILE = path.join(__dirname, 'data', 'themes.json');
+const THEME_SALT = process.env.THEME_SALT || rawKey;
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+const THEME_NAME = /^[a-zA-Z0-9 _-]{3,28}$/;
+
+let userThemes = [];
+try {
+  fs.mkdirSync(path.dirname(THEMES_FILE), { recursive: true });
+  if (fs.existsSync(THEMES_FILE)) {
+    const parsed = JSON.parse(fs.readFileSync(THEMES_FILE, 'utf8'));
+    if (Array.isArray(parsed)) userThemes = parsed;
+  }
+} catch (err) {
+  console.error('Theme store init failed:', err.message);
+}
+
+function saveThemes() {
+  try {
+    fs.writeFileSync(THEMES_FILE, JSON.stringify(userThemes, null, 2));
+  } catch (err) {
+    console.error('Theme store save failed:', err.message);
+  }
+}
+
+function hashIdentity(clientId) {
+  return crypto.createHash('sha256').update(`${clientId}:${THEME_SALT}`).digest('hex');
+}
+
+// Tiny in-memory sliding-window limiter: key -> timestamps[]
+const rateBuckets = new Map();
+function hitRateLimit(key, max, windowMs) {
+  const now = Date.now();
+  const hits = (rateBuckets.get(key) || []).filter(t => now - t < windowMs);
+  if (hits.length >= max) {
+    rateBuckets.set(key, hits);
+    return true;
+  }
+  hits.push(now);
+  rateBuckets.set(key, hits);
+  // Prevent unbounded growth
+  if (rateBuckets.size > 5000) {
+    for (const [k, v] of rateBuckets.entries()) {
+      if (v.length === 0 || now - v[v.length - 1] > windowMs) rateBuckets.delete(k);
+    }
+  }
+  return false;
+}
+
+function publicTheme(t) {
+  const { likedBy, authorHash, ...rest } = t;
+  return rest;
+}
+
+// List community themes (newest first, no identity hashes exposed)
+app.get('/api/themes', (req, res) => {
+  res.json([...userThemes].reverse().slice(0, 200).map(publicTheme));
+});
+
+// Submit a theme: max 3/hour per salted browser id, 20/hour per IP (production only)
+app.post('/api/themes', (req, res) => {
+  const { name, author = '', inactiveColor, minActivityColor, maxActivityColor, clientId } = req.body || {};
+
+  if (!clientId || typeof clientId !== 'string' || clientId.length < 8 || clientId.length > 128) {
+    return res.status(400).json({ error: 'clientId required' });
+  }
+  if (!name || !THEME_NAME.test(name)) {
+    return res.status(400).json({ error: 'Name must be 3-28 chars: letters, numbers, space, _ or -' });
+  }
+  if (author && (typeof author !== 'string' || author.length > 24 || !/^[a-zA-Z0-9 _-]*$/.test(author))) {
+    return res.status(400).json({ error: 'Author must be max 24 chars: letters, numbers, space, _ or -' });
+  }
+  for (const c of [inactiveColor, minActivityColor, maxActivityColor]) {
+    if (!c || !HEX_COLOR.test(c)) return res.status(400).json({ error: 'Colors must be #rrggbb hex' });
+  }
+
+  const authorHash = hashIdentity(clientId);
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  // No rate limits in dev — publish freely while iterating
+  const limitsEnabled = process.env.NODE_ENV === 'production';
+  if (limitsEnabled && (hitRateLimit(`theme-submit:id:${authorHash}`, 3, 60 * 60 * 1000) ||
+      hitRateLimit(`theme-submit:ip:${ip}`, 20, 60 * 60 * 1000))) {
+    return res.status(429).json({ error: 'Rate limit reached — try again later' });
+  }
+
+  if (userThemes.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+    return res.status(409).json({ error: 'A theme with this name already exists' });
+  }
+  if (limitsEnabled && userThemes.filter(t => t.authorHash === authorHash).length >= 10) {
+    return res.status(429).json({ error: 'Max 10 themes per browser — like others instead' });
+  }
+
+  const theme = {
+    id: crypto.randomBytes(4).toString('hex'),
+    name,
+    author: author || 'anonymous',
+    inactiveColor: inactiveColor.toLowerCase(),
+    minActivityColor: minActivityColor.toLowerCase(),
+    maxActivityColor: maxActivityColor.toLowerCase(),
+    likes: 0,
+    likedBy: [],
+    authorHash,
+    createdAt: Date.now()
+  };
+  userThemes.push(theme);
+  saveThemes();
+  const { likedBy, authorHash: _omit, ...out } = theme;
+  res.status(201).json(out);
+});
+
+// Like a theme: one per salted browser id, 30/hour per identity
+app.post('/api/themes/:id/like', (req, res) => {
+  const { clientId } = req.body || {};
+  if (!clientId || typeof clientId !== 'string' || clientId.length < 8 || clientId.length > 128) {
+    return res.status(400).json({ error: 'clientId required' });
+  }
+  const authorHash = hashIdentity(clientId);
+  if (hitRateLimit(`theme-like:id:${authorHash}`, 30, 60 * 60 * 1000)) {
+    return res.status(429).json({ error: 'Rate limit reached — try again later' });
+  }
+  const theme = userThemes.find(t => t.id === req.params.id);
+  if (!theme) return res.status(404).json({ error: 'Theme not found' });
+  if (theme.likedBy.includes(authorHash)) {
+    return res.status(409).json({ error: 'Already liked' });
+  }
+  theme.likedBy.push(authorHash);
+  theme.likes = theme.likedBy.length;
+  saveThemes();
+  res.json(publicTheme(theme));
+});
+
 // Serve frontend static files from the Vite build 'dist' directory
 app.use(express.static(path.join(__dirname, 'dist')));
+
+// Explicit agent surface (Vite may skip dotfiles in public/)
+app.get('/.well-known/ai-plugin.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.sendFile(path.join(__dirname, 'dist', '.well-known', 'ai-plugin.json'), (err) => {
+    if (err) res.sendFile(path.join(__dirname, 'public', '.well-known', 'ai-plugin.json'));
+  });
+});
+
+app.get('/llms.txt', (req, res) => {
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'dist', 'llms.txt'), (err) => {
+    if (err) res.sendFile(path.join(__dirname, 'public', 'llms.txt'));
+  });
+});
+
+app.get('/openapi.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.sendFile(path.join(__dirname, 'dist', 'openapi.json'), (err) => {
+    if (err) res.sendFile(path.join(__dirname, 'public', 'openapi.json'));
+  });
+});
 
 // Serve index.html for client-side routing on any non-API path
 app.get('*', (req, res) => {

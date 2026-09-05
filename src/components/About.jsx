@@ -13,13 +13,7 @@ const PARAMS = [
   ['token', 'Encrypted OAuth payload for private repos. Never share publicly.', '—'],
 ];
 
-const AGENT_SETUP = `# GitHub Chart Builder — agent setup
-Base: https://gh.ruu.by
-Embed: ![contributions](https://gh.ruu.by/api/github-contributions/USERNAME?months=12)
-Params: months 1-48 OR from/to YYYY-MM-DD; repo=owner/repo,...; boxSize/boxSpacing/borderRadius; backgroundColor/inactiveColor/minActivityColor/maxActivityColor/labelColor; showLabels/showYears/ignoreOutliers booleans.
-Guide: https://gh.ruu.by/agents.md
-Spec: https://gh.ruu.by/openapi.json
-Rules: token= is encrypted OAuth payload only — never send/log a raw GitHub PAT, never publish URLs containing ?token=.`;
+const AGENT_SETUP = `Read and follow https://gh.ruu.by/agents.md`;
 
 const About = ({ onBack }) => {
   const [copiedSetup, setCopiedSetup] = useState(false);

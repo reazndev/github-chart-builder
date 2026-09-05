@@ -5,13 +5,18 @@ const Header = ({ auth, handleLogin, handleLogout, route, navigate }) => {
   return (
     <header className="header">
       <div className="header-container">
-        <div className="header-title-section">
+        <button
+          type="button"
+          className="header-brand"
+          onClick={() => navigate('/')}
+          aria-label="Go to builder"
+        >
           <Github className="header-icon" aria-hidden="true" />
-          <div>
+          <span>
             <h1 className="header-title">Contributions Chart Builder</h1>
             <p className="header-subtitle">Customize your GitHub contribution graph</p>
-          </div>
-        </div>
+          </span>
+        </button>
         <div className="header-actions">
           <nav className="header-nav" aria-label="Primary">
             <button

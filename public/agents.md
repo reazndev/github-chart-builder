@@ -1,74 +1,75 @@
-# GitHub Chart Builder — Agent Guide
+---
+name: github-chart-builder
+description: |
+  GitHub Chart Builder renders any GitHub user's contribution history as a
+  customizable SVG chart for READMEs and portfolios. Use this skill to choose
+  the path that matches the work the agent needs to do.
+---
 
-> Canonical base: `https://gh.ruu.by` (override with your deploy origin in dev).
-> Machine spec: [`/openapi.json`](./openapi.json) · Short ref: [`/llms.txt`](./llms.txt)
+# GitHub Chart Builder
 
-## What this is
+Turn any GitHub contribution history into an embeddable SVG. No SDK, no signup
+for public data. One image endpoint, one repo-list endpoint, one theme store.
 
-One image endpoint that renders any GitHub user's contribution history as a
-customizable SVG. No SDK, no signup for public data. Embed anywhere with a URL.
+Base: `https://gh.ruu.by` (override with your deploy origin in dev).
+Machine spec: [`/openapi.json`](./openapi.json) · Short ref: [`/llms.txt`](./llms.txt)
 
-## Quick start
+## Choose your path
+
+Choose the path that matches the task:
+
+- **Public chart for a README/portfolio** -> Path A (embed)
+- **Private contributions included** -> Path B (OAuth)
+- **Browse or reuse community themes** -> Path C (theme store)
+- **Just need raw schemas** -> `/openapi.json`
+
+---
+
+## Path A: Embed a public chart
 
 ```md
 ![contributions](https://gh.ruu.by/api/github-contributions/USERNAME?months=12)
 ```
 
 1. Replace `USERNAME` with the GitHub login.
-2. Tune query params (below).
-3. Paste the URL as a Markdown image into a README / portfolio / `<img>` tag.
+2. Tune query params (all optional, defaults shown):
+   `months=12` (1–48, overrides `from`/`to`) · `from`/`to` as `YYYY-MM-DD`
+   (`to` defaults to today) · `repo=owner/repo,other/repo` (bare names count
+   as owned by the user) · `boxSize=12` / `boxSpacing=3` / `borderRadius=3` ·
+   `backgroundColor=transparent` / `inactiveColor` / `minActivityColor` /
+   `maxActivityColor` / `labelColor` as `#rrggbb` · `showLabels=true` /
+   `showYears=false` / `ignoreOutliers=false`.
+3. Paste the URL as a Markdown image or `<img>` tag. No token needed.
 
-## Endpoints
+Output is `image/svg+xml` (cached ~10 min server, 1h CDN). Days carry
+`<title>` tooltips. `500 {error, details}` means bad username or GitHub
+upstream trouble — surface `details`.
 
-### `GET /api/github-contributions/{username}` → `image/svg+xml`
+## Path B: Private contributions (OAuth)
 
-| Param | Meaning | Example |
-|---|---|---|
-| `months` (1–48) | Preset range ending today. Overrides `from`/`to`. | `?months=12` |
-| `from` / `to` | Custom range `YYYY-MM-DD`. `to` defaults to today. | `?from=2024-01-01` |
-| `repo` | Comma-separated `owner/repo` or bare names (bare = owned by user). | `?repo=facebook/react` |
-| `boxSize` / `boxSpacing` / `borderRadius` | Cell geometry in px. | `12 / 3 / 3` |
-| `backgroundColor` / `inactiveColor` / `minActivityColor` / `maxActivityColor` | Hex `#rrggbb` or `transparent` (bg only). | `#ebedf0` |
-| `labelColor` / `showLabels` / `showYears` | Month + year markers. | `true / false` |
-| `ignoreOutliers` | Clip color scale to 98th percentile of active days. | `false` |
-| `token` | Encrypted OAuth payload for **private** contributions (see Auth). | — |
+Public charts need no token. For private activity the human must log in first:
 
-Output is cached ~10 min server-side, 1h CDN header. Days carry `<title>`
-tooltips (`date + count`). Treat `500 {error, details}` as "bad username or
-GitHub upstream error" and surface `details`.
+1. Human opens `GET /api/auth/github` (`repo,read:user` scope) and approves.
+2. The callback lands on `/?token=<aes-256-gcm>&username=<login>`; the app
+   stores the blob in localStorage and attaches it as `?token=` (chart) or
+   `Authorization: Bearer` (repo list).
 
-### `GET /api/github-repos/{username}` → `["owner/repo", …]`
+Hard rules:
 
-Repo names for autocomplete (up to 100, newest first). Accepts the same
-optional encrypted `token` via `?token=` or `Authorization: Bearer`.
+- `token=` is **always** the encrypted payload. Never send, log, or commit
+  a raw GitHub PAT.
+- Never publish or embed a URL containing `?token=`. Anyone holding it can
+  list private repo **names** (`/api/github-repos/{username}`) and private
+  per-day **counts** until the grant is revoked. It cannot read source code
+  — this API only exposes names + counts, and GitHub rejects the blob.
 
-### `GET /api/auth/github` → `302`
+## Path C: Community themes
 
-Starts GitHub OAuth (`repo,read:user`). The callback returns the browser to
-`/?token=<aes-256-gcm>&username=<login>`. The frontend stores the blob in
-localStorage and attaches it to API calls.
+Human page: `/themes`. To apply a theme, set its three colors on the chart URL.
 
-### Theme store
-
-- `GET /api/themes` → `[{id,name,inactiveColor,minActivityColor,maxActivityColor,likes,createdAt}]` (newest first).
-- `POST /api/themes` → `{name,inactiveColor,minActivityColor,maxActivityColor,clientId}` (anonymous browser id; 3/hour + 10 total per id in production).
-- `POST /api/themes/:id/like` → `{clientId}`, one like per id.
-- Human page: `/themes`. To apply a theme, set the three colors on the chart URL.
-
-## Auth rules (hard requirements)
-
-- `token=` is **always** the encrypted payload from the OAuth callback.
-  Never send, log, or commit a raw GitHub PAT.
-- Never publish or embed a URL containing `?token=` — anyone holding it can
-  list that user's private repo **names** and private contribution **counts**
-  via this API until the OAuth grant is revoked. It cannot read source code
-  (this API only exposes names + per-day counts, and GitHub rejects the blob).
-- Public charts need no token at all.
-
-## Notes
-
-- `CORS: *` on `GET` — safe to fetch/embed from any origin.
-- Theme presets (github, sunset, ocean, …) with exact hexes live under
-  `x-presets` in `/openapi.json`.
-- Something wrong? Retry once after a minute (upstream rate limits), then
-  report `details` from the JSON error body.
+- `GET /api/themes` → newest-first `[{id,name,inactiveColor,minActivityColor,maxActivityColor,likes,createdAt}]`
+- `POST /api/themes` → `{name,inactiveColor,minActivityColor,maxActivityColor,clientId}`
+  (anonymous browser id, salted+hashed server-side; 3/hour + 10 total per id
+  in production)
+- `POST /api/themes/:id/like` → `{clientId}`, one like per id
+- Built-in preset hexes live under `x-presets` in `/openapi.json`.

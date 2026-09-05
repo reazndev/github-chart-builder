@@ -343,7 +343,7 @@ const App = () => {
         )}
       </main>
 
-      <Footer navigate={navigate} />
+      <Footer />
     </div>
   );
 };
